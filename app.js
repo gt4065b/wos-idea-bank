@@ -207,6 +207,7 @@ function renderDrawer() {
         <div class="dr-sec-title">${t('바로가기')}</div>
         ${link('#/new', '➕', t('아이디어 등록'))}
         ${link('#/me', '🙋', t('내 활동'))}
+        ${link('#/video', '📺', t('AI 학습 영상'))}
         ${isStaff() ? link('#/review', '⚖️', t('심의')) : ''}
         ${user.role === 'admin' ? link('#/admin', '⚙️', t('관리')) : ''}
       </div>` : ''}
@@ -275,7 +276,30 @@ const routes = [
   [/^#\/review$/, reviewPage],
   [/^#\/admin$/, adminPage],
   [/^#\/profile$/, () => profilePage(false)],
+  [/^#\/video$/, videoPage],
 ];
+
+// ───────────── AI 학습 영상 ─────────────
+// 업무 개선 아이디어에 도움이 되는 유튜브 영상. 영상을 더 넣으려면 아래 목록에 { id, title, channel }을 추가
+const VIDEOS = [
+  { id: 'Y3Xz4C3kgBA', title: '조코딩의 AI 리터러시 특강 3강 : 2026, AI 에이전트가 바꾼 우리의 업무', channel: '조코딩 JoCoding' },
+];
+
+function videoPage() {
+  main.innerHTML = `
+    <h2>📺 ${t('AI 학습 영상')}</h2>
+    <p class="muted">${t('AI 에이전트로 업무를 어떻게 바꿀 수 있는지 영상으로 알아보세요.')}</p>
+    ${VIDEOS.map((v) => `
+    <section class="card video-card">
+      <div class="video-frame">
+        <iframe src="https://www.youtube-nocookie.com/embed/${esc(v.id)}" title="${esc(v.title)}" loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      </div>
+      <h3>${esc(v.title)}</h3>
+      <p class="muted">${esc(v.channel)} · <a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${t('유튜브에서 보기 ↗')}</a></p>
+    </section>`).join('')}`;
+}
 
 async function render() {
   if (!user) { renderNav(); return loginPage(); }

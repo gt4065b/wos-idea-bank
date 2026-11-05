@@ -382,3 +382,9 @@ legend { font-weight: 600; font-size: .93rem; margin-bottom: 6px; padding: 0; }
   .filters #sort { grid-column: 1 / -1; }
   .comment-form { flex-direction: column; align-items: stretch; }
 }
+
+/* AI 학습 영상 */
+.video-card h3 { margin: 12px 0 4px; font-size: 1rem; line-height: 1.4; }
+.video-card p { margin: 0; font-size: .88rem; }
+.video-frame { position: relative; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #000; }
+.video-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
