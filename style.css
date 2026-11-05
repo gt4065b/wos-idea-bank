@@ -101,13 +101,28 @@ body { padding-left: calc(var(--rail-w) + env(safe-area-inset-left)); transition
 #logout { color: var(--danger); }
 #rail-toggle .dr-ico { font-size: 1.3rem; color: var(--muted); }
 
+/* 메뉴 안 영상 목록 (접고 펼치기) */
+.dr-chev { font-size: .8rem; color: var(--muted); margin-left: 2px; }
+.dr-vids { margin: 2px 0 6px 20px; padding-left: 10px; border-left: 2px solid var(--primary-soft); }
+.dr-vid-all { display: block; font-size: .82rem; font-weight: 700; padding: 6px 8px; border-radius: 8px; white-space: nowrap; }
+.dr-vid-all.on, .dr-vid-all:hover { background: var(--primary-soft); }
+.dr-vid-scroll { max-height: min(46vh, 420px); overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+.dr-vid { display: block; padding: 7px 8px; border-radius: 8px; color: var(--text); }
+.dr-vid:hover, .dr-vid:focus-visible { background: #f5f6f8; }
+.dr-vid.on { background: var(--primary-soft); }
+.dr-vid.on .dr-vid-t { color: var(--primary); font-weight: 700; }
+.dr-vid-t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: .84rem; line-height: 1.35; }
+.dr-vid small { display: block; margin-top: 2px; font-size: .72rem; color: var(--muted); line-height: 1.3; }
+
 /* 접힌 상태: 아이콘만 */
 body:not(.rail-expanded) .rail .dr-label,
 body:not(.rail-expanded) .rail .dr-cnt,
 body:not(.rail-expanded) .rail .dr-who,
 body:not(.rail-expanded) .rail .dr-points,
 body:not(.rail-expanded) .rail .dr-sec-title,
-body:not(.rail-expanded) .rail .dr-lang { display: none; }
+body:not(.rail-expanded) .rail .dr-lang,
+body:not(.rail-expanded) .rail .dr-chev,
+body:not(.rail-expanded) .rail .dr-vids { display: none; }
 body:not(.rail-expanded) .rail .dr-item { justify-content: center; padding: 8px 0; gap: 0; }
 body:not(.rail-expanded) .rail .dr-head { padding: 10px 0; display: flex; justify-content: center; }
 body:not(.rail-expanded) .rail .dr-sec { padding: 4px 6px; }
@@ -388,3 +403,24 @@ legend { font-weight: 600; font-size: .93rem; margin-bottom: 6px; padding: 0; }
 .video-card p { margin: 0; font-size: .88rem; }
 .video-frame { position: relative; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #000; }
 .video-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+/* AI 학습 영상: 목록 */
+.vfilters { grid-template-columns: 1fr auto; margin-top: 14px; }
+.vfilters input { grid-column: auto; }
+.vcount { margin: 0 0 8px; font-size: .86rem; }
+.vgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.vcard { display: flex; flex-direction: column; background: var(--card, #fff); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); color: var(--text); transition: transform .15s ease; }
+.vcard:hover { transform: translateY(-2px); }
+.vthumb { display: block; aspect-ratio: 16 / 9; background: #e5e7eb; }
+.vthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vinfo { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px 12px; }
+.vinfo b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: .93rem; line-height: 1.4; }
+.vinfo small { color: var(--muted); font-size: .78rem; }
+.vnote { font-size: .78rem; margin-top: 14px; }
+@media (max-width: 600px) {
+  .vgrid { grid-template-columns: 1fr; }
+  .vcard { flex-direction: row; }
+  .vthumb { width: 42%; flex: none; }
+  .vinfo { padding: 8px 10px; min-width: 0; }
+  body.rail-expanded .vfilters { grid-template-columns: 1fr; }
+}

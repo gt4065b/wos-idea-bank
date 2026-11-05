@@ -4,6 +4,7 @@
 import { CONFIG } from './config.js';
 import { createStore } from './store.js';
 import { t, lang, setLang, LANGS, weekday } from './i18n.js';
+import { VIDEOS, VIDEOS_UPDATED } from './videos.js';
 
 // ───────────── 공통 도구 ─────────────
 
@@ -207,9 +208,12 @@ function renderDrawer() {
         <div class="dr-sec-title">${t('바로가기')}</div>
         ${link('#/new', '➕', t('아이디어 등록'))}
         ${link('#/me', '🙋', t('내 활동'))}
-        ${link('#/video', '📺', t('AI 학습 영상'))}
         ${isStaff() ? link('#/review', '⚖️', t('심의')) : ''}
         ${user.role === 'admin' ? link('#/admin', '⚙️', t('관리')) : ''}
+      </div>
+      <div class="dr-sec">
+        <div class="dr-sec-title">${t('학습')}</div>
+        ${videoToggle(h, item)}
       </div>` : ''}
       <div class="dr-sec">
         <div class="dr-sec-title">${t('설정')}</div>
@@ -230,6 +234,7 @@ function renderDrawer() {
   // 접힌 상태의 🌐: 메뉴를 펼쳐 언어 버튼을 보여 줌
   $('#lang-mini').onclick = () => setRail(true);
   $('#rail-toggle').onclick = () => setRail(!railExpanded());
+  bindVideoToggle();
   if (expanded) fillDrawerCounts();
 }
 
@@ -276,29 +281,132 @@ const routes = [
   [/^#\/review$/, reviewPage],
   [/^#\/admin$/, adminPage],
   [/^#\/profile$/, () => profilePage(false)],
-  [/^#\/video$/, videoPage],
+  [/^#\/video$/, videoListPage],
+  [/^#\/video\/([\w-]+)$/, videoWatchPage],
 ];
 
 // ───────────── AI 학습 영상 ─────────────
-// 업무 개선 아이디어에 도움이 되는 유튜브 영상. 영상을 더 넣으려면 아래 목록에 { id, title, channel }을 추가
-const VIDEOS = [
-  { id: 'Y3Xz4C3kgBA', title: '조코딩의 AI 리터러시 특강 3강 : 2026, AI 에이전트가 바꾼 우리의 업무', channel: '조코딩 JoCoding' },
-];
+// 영상 목록은 videos.js 에 있습니다. 화면: 목록(#/video) → 시청(#/video/영상ID)
+// 왼쪽 메뉴의 'AI 학습 영상'을 누르면 바로 아래에 영상 목록이 펼쳐집니다.
 
-function videoPage() {
+const VID_OPEN_KEY = 'wos-videos-open';
+const videoById = (id) => VIDEOS.find((v) => v.id === id);
+const byNewest = (a, b) => (b.date || '').localeCompare(a.date || '');
+const fmtViews = (n) => {
+  const num = new Intl.NumberFormat(lang === 'zh' ? 'zh-CN' : lang, { notation: 'compact', maximumFractionDigits: 1 }).format(n || 0);
+  return t('조회수 {n}회', { n: num });
+};
+const fmtVDate = (d) => (d || '').replace(/-/g, '.');
+const vThumb = (id) => `https://i.ytimg.com/vi/${encodeURIComponent(id)}/mqdefault.jpg`;
+const vMeta = (v) => `${esc(fmtViews(v.views))} · ${esc(fmtVDate(v.date))}`;
+
+let videosOpen = (() => { try { return localStorage.getItem(VID_OPEN_KEY) === '1'; } catch { return false; } })();
+let vidListScroll = 0;
+let vidLastHash = '';
+
+// 왼쪽 메뉴 안의 접고 펼치는 영상 목록
+function videoToggle(h, item) {
+  const onVideo = h.startsWith('#/video');
+  if (onVideo && h !== vidLastHash) videosOpen = true; // 영상 화면으로 들어오면 펼쳐 줌 (그 뒤엔 직접 접을 수 있음)
+  vidLastHash = h;
+  const open = videosOpen && railExpanded();
+  const cur = (h.match(/^#\/video\/([\w-]+)/) || [])[1];
+  const head = item({ tag: 'button', on: h === '#/video', more: `type="button" id="vid-toggle" aria-expanded="${open}" aria-controls="vid-list"` },
+    '📺', t('AI 학습 영상'), `<span class="dr-cnt">${VIDEOS.length}</span><span class="dr-chev" aria-hidden="true">${open ? '▾' : '▸'}</span>`);
+  if (!open) return head;
+  const list = [...VIDEOS].sort(byNewest).map((v) => `
+    <a class="dr-vid ${cur === v.id ? 'on' : ''}" href="#/video/${esc(v.id)}" ${cur === v.id ? 'aria-current="page"' : ''}>
+      <span class="dr-vid-t">${esc(v.title)}</span>
+      <small>${vMeta(v)}</small>
+    </a>`).join('');
+  return `${head}
+    <div class="dr-vids" id="vid-list">
+      <a class="dr-vid-all ${h === '#/video' ? 'on' : ''}" href="#/video">${t('전체 목록 보기 →')}</a>
+      <div class="dr-vid-scroll">${list}</div>
+    </div>`;
+}
+
+function bindVideoToggle() {
+  const btn = $('#vid-toggle');
+  if (!btn) return;
+  const sc = $('#drawer .dr-vid-scroll');
+  if (sc) { sc.scrollTop = vidListScroll; sc.onscroll = () => { vidListScroll = sc.scrollTop; }; }
+  btn.onclick = () => {
+    // 접힌 메뉴(아이콘만)에서 누르면 메뉴를 펼치고 목록을 엶
+    if (!railExpanded()) { videosOpen = true; saveVideosOpen(); setRail(true); revealVideoList(); return; }
+    videosOpen = !videosOpen;
+    saveVideosOpen();
+    renderDrawer();
+    if (videosOpen) revealVideoList();
+  };
+}
+// 펼친 목록이 메뉴 아래쪽에 가려지지 않게 메뉴를 스크롤
+function revealVideoList() {
+  // 메뉴가 펼쳐지는 애니메이션(0.25초)이 끝난 뒤 위치를 재야 정확함
+  setTimeout(() => {
+    const body = $('#drawer .dr-body'), btn = $('#vid-toggle');
+    if (!body || !btn) return;
+    const top = body.scrollTop + btn.getBoundingClientRect().top - body.getBoundingClientRect().top - 8;
+    body.scrollTo({ top, behavior: 'smooth' });
+  }, 300);
+}
+function saveVideosOpen() { try { localStorage.setItem(VID_OPEN_KEY, videosOpen ? '1' : '0'); } catch { /* 저장소 사용 불가 */ } }
+
+const videoState = { q: '', sort: 'new' };
+
+function videoCard(v) {
+  return `
+    <a class="vcard" href="#/video/${esc(v.id)}">
+      <span class="vthumb"><img src="${vThumb(v.id)}" alt="" loading="lazy" width="320" height="180"></span>
+      <span class="vinfo"><b>${esc(v.title)}</b><small>${esc(v.channel)}</small><small>${vMeta(v)}</small></span>
+    </a>`;
+}
+
+// 목록 화면: 검색·정렬 + 썸네일 카드
+function videoListPage() {
   main.innerHTML = `
     <h2>📺 ${t('AI 학습 영상')}</h2>
     <p class="muted">${t('AI 에이전트로 업무를 어떻게 바꿀 수 있는지 영상으로 알아보세요.')}</p>
-    ${VIDEOS.map((v) => `
+    <div class="filters vfilters">
+      <input id="vq" type="search" placeholder="${t('영상 제목 검색')}" value="${esc(videoState.q)}">
+      <select id="vsort"><option value="new">${t('최신순')}</option><option value="views">${t('조회수순')}</option><option value="old">${t('오래된순')}</option></select>
+    </div>
+    <p class="vcount muted" id="vcount"></p>
+    <div class="vgrid" id="vgrid"></div>
+    <p class="muted vnote">${t('조회수는 {d} 기준입니다.', { d: fmtVDate(VIDEOS_UPDATED) })}</p>`;
+  $('#vsort').value = videoState.sort;
+  const draw = () => {
+    const q = videoState.q.trim().toLowerCase();
+    const list = VIDEOS.filter((v) => !q || v.title.toLowerCase().includes(q) || (v.channel || '').toLowerCase().includes(q));
+    list.sort(videoState.sort === 'views' ? (a, b) => (b.views || 0) - (a.views || 0) : videoState.sort === 'old' ? (a, b) => byNewest(b, a) : byNewest);
+    $('#vcount').textContent = t('영상 {n}개', { n: list.length });
+    $('#vgrid').innerHTML = list.length ? list.map(videoCard).join('') : `<div class="empty">${t('검색 결과가 없습니다.')}</div>`;
+  };
+  $('#vq').oninput = (e) => { videoState.q = e.target.value; draw(); };
+  $('#vsort').onchange = (e) => { videoState.sort = e.target.value; draw(); };
+  draw();
+}
+
+// 시청 화면: 영상 하나 + 이어서 볼 영상
+function videoWatchPage(id) {
+  const v = videoById(id);
+  if (!v) { main.innerHTML = `<div class="card">${t('영상을 찾을 수 없습니다.')} <a href="#/video">${t('목록으로')}</a></div>`; return; }
+  const sorted = [...VIDEOS].sort(byNewest);
+  const i = sorted.indexOf(v);
+  const more = [...sorted.slice(i + 1), ...sorted.slice(0, i)].slice(0, 4);
+  main.innerHTML = `
+    <a href="#/video" class="back">${t('← 영상 목록')}</a>
     <section class="card video-card">
       <div class="video-frame">
-        <iframe src="https://www.youtube-nocookie.com/embed/${esc(v.id)}" title="${esc(v.title)}" loading="lazy"
+        <iframe src="https://www.youtube-nocookie.com/embed/${esc(v.id)}" title="${esc(v.title)}"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
       </div>
       <h3>${esc(v.title)}</h3>
-      <p class="muted">${esc(v.channel)} · <a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${t('유튜브에서 보기 ↗')}</a></p>
-    </section>`).join('')}`;
+      <p class="muted">${esc(v.channel)} · ${vMeta(v)} · <a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${t('유튜브에서 보기 ↗')}</a></p>
+    </section>
+    ${more.length ? `<h2 class="sec">${t('다른 영상')}</h2><div class="vgrid">${more.map(videoCard).join('')}</div>` : ''}`;
+  window.scrollTo(0, 0);
 }
 
 async function render() {
